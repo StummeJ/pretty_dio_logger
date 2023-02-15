@@ -81,7 +81,7 @@ class PrettyDioLogger extends Interceptor {
             ..addEntries(data.files);
           _printMapAsTable(formDataMap, header: 'Form data | ${data.boundary}');
         } else {
-          _printBlock(data.toString());
+          _printBoxed(header: "Body", text: data.toString());
         }
       }
     }
@@ -159,7 +159,7 @@ class PrettyDioLogger extends Interceptor {
         _printList(response.data as List);
         logPrint('║${_indent()}[');
       } else {
-        _printBoxed(header: "Body", text: response.data.toString());
+        _printBlock(response.data.toString());
       }
     }
   }
