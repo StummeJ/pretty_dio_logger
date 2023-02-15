@@ -81,7 +81,11 @@ class PrettyDioLogger extends Interceptor {
             ..addEntries(data.files);
           _printMapAsTable(formDataMap, header: 'Form data | ${data.boundary}');
         } else {
-          _printBoxed(header: "Body", text: data.toString());
+          logPrint('╔ Body');
+          logPrint('║');
+          _printBlock(data.toString());
+          logPrint('║');
+          _printLine('╚');
         }
       }
     }
