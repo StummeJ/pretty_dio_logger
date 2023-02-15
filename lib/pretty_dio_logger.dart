@@ -51,25 +51,30 @@ class PrettyDioLogger extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    var redactedOptions = redactRequest(options);
+
     if (request) {
-      _printRequestHeader(options);
+      _printRequestHeader(redactedOptions);
     }
     if (requestHeader) {
-      _printMapAsTable(options.queryParameters, header: 'Query Parameters');
+      _printMapAsTable(redactedOptions.queryParameters,
+          header: 'Query Parameters');
       final requestHeaders = <String, dynamic>{};
-      requestHeaders.addAll(options.headers);
-      requestHeaders['contentType'] = options.contentType?.toString();
-      requestHeaders['responseType'] = options.responseType.toString();
-      requestHeaders['followRedirects'] = options.followRedirects;
-      requestHeaders['connectTimeout'] = options.connectTimeout;
-      requestHeaders['receiveTimeout'] = options.receiveTimeout;
+      requestHeaders.addAll(redactedOptions.headers);
+      requestHeaders['contentType'] = redactedOptions.contentType?.toString();
+      requestHeaders['responseType'] = redactedOptions.responseType.toString();
+      requestHeaders['followRedirects'] = redactedOptions.followRedirects;
+      requestHeaders['connectTimeout'] = redactedOptions.connectTimeout;
+      requestHeaders['receiveTimeout'] = redactedOptions.receiveTimeout;
       _printMapAsTable(requestHeaders, header: 'Headers');
-      _printMapAsTable(options.extra, header: 'Extras');
+      _printMapAsTable(redactedOptions.extra, header: 'Extras');
     }
-    if (requestBody && options.method != 'GET') {
-      final dynamic data = options.data;
+    if (requestBody && redactedOptions.method != 'GET') {
+      final dynamic data = redactedOptions.data;
       if (data != null) {
-        if (data is Map) _printMapAsTable(options.data as Map?, header: 'Body');
+        if (data is Map) {
+          _printMapAsTable(redactedOptions.data as Map?, header: 'Body');
+        }
         if (data is FormData) {
           final formDataMap = <String, dynamic>{}
             ..addEntries(data.fields)
@@ -107,10 +112,12 @@ class PrettyDioLogger extends Interceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    _printResponseHeader(response);
+    var redactedResponse = redactResponse(response);
+
+    _printResponseHeader(redactedResponse);
     if (responseHeader) {
       final responseHeaders = <String, String>{};
-      response.headers
+      redactedResponse.headers
           .forEach((k, list) => responseHeaders[k] = list.toString());
       _printMapAsTable(responseHeaders, header: 'Headers');
     }
@@ -118,11 +125,21 @@ class PrettyDioLogger extends Interceptor {
     if (responseBody) {
       logPrint('╔ Body');
       logPrint('║');
-      _printResponse(response);
+      _printResponse(redactedResponse);
       logPrint('║');
       _printLine('╚');
     }
     super.onResponse(response, handler);
+  }
+
+  /// Override to redact sensitive information from the request from the logs.
+  RequestOptions redactRequest(RequestOptions options) {
+    return options;
+  }
+
+  /// Override to redact sensitive information from the response from the logs.
+  Response redactResponse(Response response) {
+    return response;
   }
 
   void _printBoxed({String? header, String? text}) {
@@ -272,5 +289,36 @@ class PrettyDioLogger extends Interceptor {
     map.forEach(
         (dynamic key, dynamic value) => _printKV(key.toString(), value));
     _printLine('╚');
+  }
+}
+
+extension ResponseExtensions on Response {
+  Response copyWith() {
+    return Response(
+      data: data,
+      requestOptions: requestOptions.copyWith(),
+      statusCode: statusCode,
+      statusMessage: statusMessage,
+      redirects: _copyRedirects(redirects),
+      extra: _copyExtra(extra),
+      headers: Headers.fromMap(headers.map),
+    );
+  }
+
+  Map<String, dynamic> _copyExtra(Map<String, dynamic> map) {
+    Map<String, dynamic> copy = const {};
+    for (var entry in map.entries) {
+      copy[entry.key] = entry.value;
+    }
+    return copy;
+  }
+
+  List<RedirectRecord> _copyRedirects(List<RedirectRecord> redirects) {
+    List<RedirectRecord> copy = [];
+    for (var redirect in redirects) {
+      copy.add(RedirectRecord(redirect.statusCode, redirect.method,
+          Uri.parse(redirect.location.toString())));
+    }
+    return copy;
   }
 }
